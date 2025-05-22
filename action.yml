@@ -110,10 +110,10 @@ runs:
           # If a remote reference can't be retrieved then we simply log that
           # If a remote reference is valid but contains no remote VEX statements then we issue a warning
           echo "Retrieving Remote VEX statements from ${BRANCH} branch of ${REPO}"
-          git remote add -f origin https://${{ inputs.gh-user }}:${{ inputs.gh-token }}@github.com/${REPO} >/dev/null || echo "Failed to fetch remote repository ${REPO}"
+          git remote add -f origin https://${{ inputs.gh-user }}:${{ inputs.gh-token }}@github.com/${REPO} || echo "Failed to fetch remote repository ${REPO}"
           git checkout --force ${BRANCH} || echo "Failed to checkout branch ${BRANCH} from remote repository ${REPO}"
           if [ -d ".vex/" ]; then
-            mv -fv .vex/*.json .${RUNNER_TEMP}/.remote-vex || echo "No remote VEX statements found, they MUST have a .json extension and be in the .vex/ directory of the remote repository"
+            mv -fv .vex/*.json ${RUNNER_TEMP}/.remote-vex/ || echo "No remote VEX statements found, they MUST have a .json extension and be in the .vex/ directory of the remote repository"
           else
             echo "::warning title=No Remote VEX Statements in ${REPO}::Repository ${REPO} did not contain a .vex/ directory on its ${BRANCH} branch"
           fi

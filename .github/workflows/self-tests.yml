@@ -14,7 +14,7 @@ jobs:
     steps:
       # Intentionally not checking out, relying on remote-vex retrieval
 
-      - name: Trivy Image Scan that Passes
+      - name: Merging Remote VEX Statements Only
         id: trivy-scan
         uses: rvesse/merge-vex-action@v1
         with:
