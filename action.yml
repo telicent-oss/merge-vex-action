@@ -127,7 +127,7 @@ runs:
 
         # List the Remote VEX statements found, if none found remove the .remote-vex/ directory otherwise the prepare-vex steps fails
         echo "Found the following Remote VEX Statements:"
-        ls -lh .remote-vex/*.json || (echo "No Remote VEX Statements found" && rm -Rf .remote-vex/)
+        ls -lh ${RUNNER_TEMP}/.remote-vex/*.json || (echo "No Remote VEX Statements found" && rm -Rf ${RUNNER_TEMP}/.remote-vex/)
 
     # For convenience as there may be many VEX statements present merge them into a single VEX file that we then
     # pass into Trivy by setting the TRIVY_VEX environment variable
@@ -143,43 +143,40 @@ runs:
 
         # If local VEX statements exist merge them together
         if [ -d ".vex/" ]; then
-          vexctl merge .vex/*.json > merged.raw.openvex.json || handle_error "Failed to merge local VEX files"
-          if [ ! -s "merged.raw.openvex.json" ]; then
-            echo "No local VEX files were merged."
-          fi
+          vexctl merge .vex/*.json > ${RUNNER_TEMP}/merged.raw.openvex.json || handle_error "Failed to merge local VEX files"
+        else
+          echo "No local VEX statements found"
         fi
         
         # If any remote VEX statements exist merge them together as well
-        if [ -d ".remote-vex/" ]; then
-          vexctl merge .remote-vex/*.json > merged.remote.openvex.json || handle_error "Failed to merge remote VEX files"
-          if [ ! -s "merged.remote.openvex.json" ]; then
-            echo "No remote VEX files were merged."
-          fi
+        if [ -d "${RUNNER_TEMP}/.remote-vex/" ]; then
+          vexctl merge ${RUNNER_TEMP}/.remote-vex/*.json > ${RUNNER_TEMP}/merged.remote.openvex.json || handle_error "Failed to merge remote VEX files"
+        else 
+          echo "No remote VEX statements found"
         fi
         
         # If both local and remote VEX statements exist merge them together into a final
         # merged file
         # Or if only remote VEX statements exist rename that file, otherwise the next if block
         # where we set TRIVY_VEX won't be triggered
-        if [ -f merged.raw.openvex.json ] && [ -f merged.remote.openvex.json ]; then
-          vexctl merge merged.raw.openvex.json merged.remote.openvex.json > merged.openvex.json || handle_error "Failed to merge local and remote VEX files"
-        elif [ -f merged.remote.openvex.json ]; then
-          mv merged.remote.openvex.json merged.openvex.json
-        elif [ -f merged.raw.openvex.json ]; then
-          mv merged.raw.openvex.json merged.openvex.json
+        if [ -f ${RUNNER_TEMP}/merged.raw.openvex.json ] && [ -f ${RUNNER_TEMP}/merged.remote.openvex.json ]; then
+          vexctl merge ${RUNNER_TEMP}/merged.raw.openvex.json ${RUNNER_TEMP}/merged.remote.openvex.json > ${RUNNER_TEMP}/merged.openvex.json || handle_error "Failed to merge local and remote VEX files"
+        elif [ -f ${RUNNER_TEMP}/merged.remote.openvex.json ]; then
+          mv ${RUNNER_TEMP}/merged.remote.openvex.json ${RUNNER_TEMP}/merged.openvex.json
+        elif [ -f ${RUNNER_TEMP}/merged.raw.openvex.json ]; then
+          mv ${RUNNER_TEMP}/merged.raw.openvex.json ${RUNNER_TEMP}/merged.openvex.json
         fi
         
         # Deduplicate entries
-        if [ -f merged.openvex.json ]; then
-          jq '. | .statements |= (unique_by(.vulnerability.name + "-" + (.products | map(.["@id"]) | join(",")))) ' merged.openvex.json > temp.openvex.json || handle_error "Failed to deduplicate VEX entries"
-          mv temp.openvex.json merged.openvex.json
+        if [ -f ${RUNNER_TEMP}/merged.openvex.json ]; then
+          jq '. | .statements |= (unique_by(.vulnerability.name + "-" + (.products | map(.["@id"]) | join(",")))) ' ${RUNNER_TEMP}/merged.openvex.json > ${RUNNER_TEMP}/temp.openvex.json || handle_error "Failed to deduplicate VEX entries"
+          mv ${RUNNER_TEMP}/temp.openvex.json ${RUNNER_TEMP}/merged.openvex.json
         fi
         
-        # Export the TRIVY_VEX environment variable if we have VEX statements available
         # We also rename the file at this point to be more descriptive
-        if [ -f merged.openvex.json ]; then
-          mv merged.openvex.json ${{ steps.sanitised.outputs.name }}-merged.openvex.json
-          echo "merged-file=${{ steps.sanitised.outputs.name}}-merged.openvex.json" >> $GITHUB_OUTPUT
+        if [ -f ${RUNNER_TEMP}/merged.openvex.json ]; then
+          mv ${RUNNER_TEMP}/merged.openvex.json ${RUNNER_TEMP}/${{ steps.sanitised.outputs.name }}-merged.openvex.json
+          echo "merged-file=${RUNNER_TEMP}/${{ steps.sanitised.outputs.name}}-merged.openvex.json" >> $GITHUB_OUTPUT
           echo "prepared=true" >> $GITHUB_OUTPUT
         else
           echo "prepared=false" >> $GITHUB_OUTPUT
@@ -191,5 +188,5 @@ runs:
       uses: actions/upload-artifact@v4.4.3
       with:
         name: ${{ steps.sanitised.outputs.name }}-merged-vex-statements
-        path: ${{ steps.sanitised.outputs.name }}-merged.openvex.json
+        path: ${{ runner.temp }}/${{ steps.sanitised.outputs.name }}-merged.openvex.json
         retention-days: 30
