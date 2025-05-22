@@ -1,0 +1,27 @@
+name: Action Self-Tests
+on:
+  push:
+    branches:
+      - "**"
+    tags:
+      - "**"
+  workflow_dispatch:
+
+jobs:
+
+  remote-only:
+    runs-on: ubuntu-latest
+    steps:
+      # Intentionally not checking out, relying on remote-vex retrieval
+
+      - name: Trivy Image Scan that Passes
+        id: trivy-scan
+        uses: rvesse/merge-vex-action@v1
+        with:
+          name: remote-only
+          remote-vex: |
+            telicent-oss/trivy-action@deduplicate_vex_entries
+            telicent-oss/trivy-action
+              telicent-oss/no-such-repo    
+            telicent-oss/telicent-base-images
+
