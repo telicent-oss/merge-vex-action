@@ -138,3 +138,39 @@ jobs:
             exit 1
           fi
 
+  nothing:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Merging Nothing together
+        id: vex-merge
+        uses: rvesse/merge-vex-action@v1
+        with:
+          name: nothing
+          remote-vex: |
+            telicent-oss/no-such-repo
+
+      - name: Verify no Merged VEX file prepared
+        run: |
+          if [ "${{ steps.vex-merge.outputs.prepared }}" != "false" ]; then
+            echo "prepared output should have been false but got ${{ steps.vex-merge.outputs.prepared }}"
+            exit 1
+          fi
+
+      - name: Try to download non-existent artifact
+        id: fail-download
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: ${{ steps.vex-merge.outputs.vex-artifact }} 
+
+      - name: Verify artifact failed to download
+        if: ${{ always() }}
+        run: |
+          if [ "${{ steps.fail-download.outcome }}" != "failure" ]; then
+            echo "Trying to download artifact should have failed but had outcome ${{ steps.fail-download.outcome }}"
+            exit 1
+          fi
+
