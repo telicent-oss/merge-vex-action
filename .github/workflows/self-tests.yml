@@ -40,4 +40,15 @@ jobs:
       - name: Show Merged VEX file
         run: |
           cat ${{ steps.vex-merge.outputs.vex-file }}
+          echo ""
+          echo "Unique statements: "
+          cat ${{ steps.vex-merge.outputs.vex-file }} | jq -r '.statements[].vulnerability.name'
+
+      - name: Verify count of unique VEX statements
+        run: |
+          STATEMENTS=$(cat ${{ steps.vex-merge.outputs.vex-file }} | jq -r '.statements[].vulnerability.name' | wc -l)
+          if [ "${STATEMENTS}" -lt 3 ]; then
+            echo "Expected at least 3 unique VEX statements"
+            exit 1
+          fi
 
