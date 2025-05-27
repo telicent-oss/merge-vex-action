@@ -34,6 +34,10 @@ jobs:
       # Further build steps that use the merged VEX file
 ```
 
+This will attempt to create a merged VEX statements file, setting several [outputs](#outputs) indicating whether it has
+done this, and where the merged file is located.  The merged file, if created, is also uploaded as a GitHub Actions
+artifact so can be accessed by subsequent jobs in the same workflow if needed.
+
 ## GitHub Token Permissions
 
 This action needs a GitHub Token in order to query the GitHub Releases API to discover the release binaries for
@@ -71,7 +75,7 @@ may be provided in two ways:
 - Remote statements from a `.vex/` directory in one/more remote repositories configured via the optional `remote-vex`
   input, see [Remote VEX Statements](#remote-vex-statements)
 
-All discovered OpenVEX statements are merged toegether using the [`vexctl`][vexctl] tool to create a single VEX
+All discovered OpenVEX statements are merged together using the [`vexctl`][vexctl] tool to create a single VEX
 statements file for the scan, this will be attached to the build as an artifact named `<name>-merged-vex-statements` so
 it can be reviewed if needed.
 
