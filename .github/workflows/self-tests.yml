@@ -94,3 +94,47 @@ jobs:
             exit 1
           fi
 
+  local-and-remote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          repository: telicent-oss/telicent-base-images
+          ref: main
+
+      - name: Merging Local and Remote VEX Statements
+        id: vex-merge
+        uses: rvesse/merge-vex-action@v1
+        with:
+          name: local-and-remote
+          remote-vex: |
+            telicent-oss/trivy-action
+
+      - name: Download Merged VEX artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.vex-merge.outputs.vex-artifact }}
+
+      - name: Verify Merged VEX file exists
+        run: |
+          if [ ! -f "${{ steps.vex-merge.outputs.vex-file }}" ]; then
+            echo "No Merged VEX file found"
+            exit 1
+          fi
+
+      - name: Show Merged VEX file
+        run: |
+          cat ${{ steps.vex-merge.outputs.vex-file }}
+          echo ""
+          echo "Unique statements: "
+          cat ${{ steps.vex-merge.outputs.vex-file }} | jq -r '.statements[].vulnerability.name'
+
+      - name: Verify count of unique VEX statements
+        run: |
+          STATEMENTS=$(cat ${{ steps.vex-merge.outputs.vex-file }} | jq -r '.statements[].vulnerability.name' | wc -l)
+          if [ "${STATEMENTS}" -lt 3 ]; then
+            echo "Expected at least 3 unique VEX statements"
+            exit 1
+          fi
+
