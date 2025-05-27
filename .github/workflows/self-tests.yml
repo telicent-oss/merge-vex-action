@@ -38,6 +38,7 @@ jobs:
 
       - name: Show Merged VEX file
         run: |
+          ls -l
           cat ${{ steps.vex-merge.outputs.vex-file }}
           echo ""
           echo "Unique statements: "
@@ -81,6 +82,7 @@ jobs:
 
       - name: Show Merged VEX file
         run: |
+          ls -l
           cat ${{ steps.vex-merge.outputs.vex-file }}
           echo ""
           echo "Unique statements: "
@@ -125,6 +127,7 @@ jobs:
 
       - name: Show Merged VEX file
         run: |
+          ls -l
           cat ${{ steps.vex-merge.outputs.vex-file }}
           echo ""
           echo "Unique statements: "

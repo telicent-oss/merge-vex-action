@@ -42,11 +42,17 @@ outputs:
   vex-file:
     value: ${{ steps.prepare-vex.outputs.merged-file }}
     description: |
-      The resulting merged VEX file, will be empty if no VEX statements were found to merge.
+      The full path to the resulting merged VEX file, will be empty if no VEX statements were found to merge.  If
+      present this will be located under the `RUNNER_TEMP` directory to avoid polluting your workspace.
+  vex-file-name:
+    value: ${{ steps.prepare-vex.outputs.filename }}
+    description: |
+      The filename of the merged VEX file as included in the uploaded artifact.  If you download the artifact then this
+      is the filename to use to access the file.
   vex-artifact:
     value: ${{ steps.sanitised.outputs.name }}-merged-vex-statements
     description: |
-      The name of a GitHub Actions artifact that has been uploaded with the merged VEX statements
+      The name of a GitHub Actions artifact that has been uploaded with the merged VEX statements.
 runs:
   using: "composite"
   steps:
@@ -177,6 +183,7 @@ runs:
         if [ -f ${RUNNER_TEMP}/merged.openvex.json ]; then
           mv ${RUNNER_TEMP}/merged.openvex.json ${RUNNER_TEMP}/${{ steps.sanitised.outputs.name }}-merged.openvex.json
           echo "merged-file=${RUNNER_TEMP}/${{ steps.sanitised.outputs.name}}-merged.openvex.json" >> $GITHUB_OUTPUT
+          echo "filename=${{ steps.sanitised.outputs.name}}-merged.openvex.json" >> $GITHUB_OUTPUT
           echo "prepared=true" >> $GITHUB_OUTPUT
         else
           echo "prepared=false" >> $GITHUB_OUTPUT
