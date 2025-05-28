@@ -1,0 +1,199 @@
+name: Merge Vex Action
+description: |
+  This action merges together VEX statements using `vexctl` to produce a single merged VEX statements file that can been
+  passed to security scanners that support OpenVEX statements.
+author: Telicent
+branding:
+  icon: 'lock'
+  color: 'green'
+inputs:
+  name:
+    required: true
+    description: |
+      Specifies a name that will be used to prefix the various temporary files and directories used by this action.
+  remote-vex:
+    required: false
+    default: ""
+    description: |
+      Specifies a new line separated list of remote repositories whose VEX statements should be
+      retrieved via sparse checkout of their `.vex/` directory.  These VEX statements will be used 
+      to augment any local VEX statements in the `.vex/` directory when scanning for vulnerabilities.
+  gh-token:
+    required: false
+    default: ${{ github.token }}
+    description: |
+      A GitHub Token needed to checkout the `remote-vex` repositories (if any)
+      Defaults to `github.token` which is the token for this build, can be overridden if this default token doesn't work
+      for your build environment.
+  gh-user:
+    required: false
+    default: ${{ github.actor }}
+    description: |
+      A GitHub User to use when cloning remote repositories to retrieve remote VEX statements.
+
+      Defaults to `github.actor` which is the user running the build, can be overridden if this default user does not 
+      match the user who owns the `gh-token` input e.g. if providing a custom GitHub Token to retrieve VEX statements
+      from private repositories.
+outputs:
+  prepared: 
+    value: ${{ steps.prepare-vex.outputs.prepared }}
+    description: |
+      A boolean value indicating whether any VEX statements were found and merged.
+  vex-file:
+    value: ${{ steps.prepare-vex.outputs.merged-file }}
+    description: |
+      The full path to the resulting merged VEX file, will be empty if no VEX statements were found to merge.  If
+      present this will be located under the `RUNNER_TEMP` directory to avoid polluting your workspace.
+  vex-file-name:
+    value: ${{ steps.prepare-vex.outputs.filename }}
+    description: |
+      The filename of the merged VEX file as included in the uploaded artifact.  If you download the artifact then this
+      is the filename to use to access the file.
+  vex-artifact:
+    value: ${{ steps.sanitised.outputs.name }}-merged-vex-statements
+    description: |
+      The name of a GitHub Actions artifact that has been uploaded with the merged VEX statements.
+runs:
+  using: "composite"
+  steps:
+    # As we're going to use the scan name for both output file names and GitHub Actions Artifacts have to sanitise it
+    # to remove characters that are disallowed, or would cause those usages to break
+    #
+    # For GitHub Actions Artifacts this is as follows:
+    # 
+    # Double quote ", Colon :, Less than <, Greater than >, Vertical bar |, Asterisk *, Question mark ?, Carriage 
+    # return \r, Line feed \n, Backslash \, Forward slash /
+    #
+    # These characters are not allowed in the artifact name due to limitations with certain file systems such as NTFS. 
+    # To maintain file system agnostic behavior, these characters are intentionally not allowed to prevent potential 
+    # problems with downloads on different file systems.
+
+    - name: Sanitise Name
+      id: sanitised
+      shell: bash
+      run: |
+        echo "name=$(echo '${{ inputs.name }}' | sed 's/[:/<>|*?\]/-/g' | tr -s '-')" >> $GITHUB_OUTPUT
+
+    - name: Setup vexctl
+      uses: openvex/setup-vexctl@main
+      with:
+        vexctl-release: '0.3.0'
+
+    - name: Download Remote VEX Statements
+      if: ${{ inputs.remote-vex != '' }}
+      shell: bash
+      run: |
+        # Use runner temporary directory to download Remote VEX statements
+        mkdir ${RUNNER_TEMP}/.remote-vex
+        pushd ${RUNNER_TEMP}/.remote-vex
+
+        # Create an empty Git repository
+        DIR_ID=0
+        for REPO in $(echo "${{ inputs.remote-vex }}"); do
+          # Check for non-empty repository
+          REPO=$(echo "${REPO}" | tr -d '[:space:]')
+          if [ -z "${REPO}" ]; then
+            continue
+          fi
+
+          # Create a fresh empty Git directory for checking out each repository
+          DIR_ID=$(( ${DIR_ID} + 1))
+          mkdir ${DIR_ID}
+          pushd ${DIR_ID}
+          git init -b main
+          git config core.sparseCheckout true
+          echo ".vex/*" > .git/info/sparse-checkout
+
+          # Determine branch, defaulting to main
+          BRANCH=${REPO##*@}
+          if [ "${REPO}" == "${BRANCH}" ]; then
+            BRANCH=main
+          else
+            REPO=${REPO%%@*}
+          fi
+
+          # Actually retrieve remote VEX statements
+          # If a remote reference can't be retrieved then we simply log that
+          # If a remote reference is valid but contains no remote VEX statements then we issue a warning
+          echo "Retrieving Remote VEX statements from ${BRANCH} branch of ${REPO}"
+          git remote add -f origin https://${{ inputs.gh-user }}:${{ inputs.gh-token }}@github.com/${REPO} || echo "Failed to fetch remote repository ${REPO}"
+          git checkout --force ${BRANCH} || echo "Failed to checkout branch ${BRANCH} from remote repository ${REPO}"
+          if [ -d ".vex/" ]; then
+            mv -fv .vex/*.json ${RUNNER_TEMP}/.remote-vex/ || echo "No remote VEX statements found, they MUST have a .json extension and be in the .vex/ directory of the remote repository"
+          else
+            echo "::warning title=No Remote VEX Statements in ${REPO}::Repository ${REPO} did not contain a .vex/ directory on its ${BRANCH} branch"
+          fi
+          git remote remove origin || echo "No remote origin to remove"
+
+          popd
+          rm -Rf ${DIR_ID}
+        done
+
+        popd
+
+        # List the Remote VEX statements found, if none found remove the .remote-vex/ directory otherwise the prepare-vex steps fails
+        echo "Found the following Remote VEX Statements:"
+        ls -lh ${RUNNER_TEMP}/.remote-vex/*.json || (echo "No Remote VEX Statements found" && rm -Rf ${RUNNER_TEMP}/.remote-vex/)
+
+    # For convenience as there may be many VEX statements present merge them into a single VEX file that we then
+    # pass into Trivy by setting the TRIVY_VEX environment variable
+    # This also serves to validate that all the VEX statements are well-formed as this will fail if they are not
+    - name: Prepare VEX Statements
+      id: prepare-vex
+      shell: bash
+      run: |
+        handle_error() {
+          echo "Error: $1"
+          exit 1
+        }
+
+        # If local VEX statements exist merge them together
+        if [ -d ".vex/" ]; then
+          vexctl merge .vex/*.json > ${RUNNER_TEMP}/merged.raw.openvex.json || handle_error "Failed to merge local VEX files"
+        else
+          echo "No local VEX statements found"
+        fi
+        
+        # If any remote VEX statements exist merge them together as well
+        if [ -d "${RUNNER_TEMP}/.remote-vex/" ]; then
+          vexctl merge ${RUNNER_TEMP}/.remote-vex/*.json > ${RUNNER_TEMP}/merged.remote.openvex.json || handle_error "Failed to merge remote VEX files"
+        else 
+          echo "No remote VEX statements found"
+        fi
+        
+        # If both local and remote VEX statements exist merge them together into a final
+        # merged file
+        # Or if only remote VEX statements exist rename that file, otherwise the next if block
+        # where we set TRIVY_VEX won't be triggered
+        if [ -f ${RUNNER_TEMP}/merged.raw.openvex.json ] && [ -f ${RUNNER_TEMP}/merged.remote.openvex.json ]; then
+          vexctl merge ${RUNNER_TEMP}/merged.raw.openvex.json ${RUNNER_TEMP}/merged.remote.openvex.json > ${RUNNER_TEMP}/merged.openvex.json || handle_error "Failed to merge local and remote VEX files"
+        elif [ -f ${RUNNER_TEMP}/merged.remote.openvex.json ]; then
+          mv ${RUNNER_TEMP}/merged.remote.openvex.json ${RUNNER_TEMP}/merged.openvex.json
+        elif [ -f ${RUNNER_TEMP}/merged.raw.openvex.json ]; then
+          mv ${RUNNER_TEMP}/merged.raw.openvex.json ${RUNNER_TEMP}/merged.openvex.json
+        fi
+        
+        # Deduplicate entries
+        if [ -f ${RUNNER_TEMP}/merged.openvex.json ]; then
+          jq '. | .statements |= (unique_by(.vulnerability.name + "-" + (.products | map(.["@id"]) | join(",")))) ' ${RUNNER_TEMP}/merged.openvex.json > ${RUNNER_TEMP}/temp.openvex.json || handle_error "Failed to deduplicate VEX entries"
+          mv ${RUNNER_TEMP}/temp.openvex.json ${RUNNER_TEMP}/merged.openvex.json
+        fi
+        
+        # We also rename the file at this point to be more descriptive
+        if [ -f ${RUNNER_TEMP}/merged.openvex.json ]; then
+          mv ${RUNNER_TEMP}/merged.openvex.json ${RUNNER_TEMP}/${{ steps.sanitised.outputs.name }}-merged.openvex.json
+          echo "merged-file=${RUNNER_TEMP}/${{ steps.sanitised.outputs.name}}-merged.openvex.json" >> $GITHUB_OUTPUT
+          echo "filename=${{ steps.sanitised.outputs.name}}-merged.openvex.json" >> $GITHUB_OUTPUT
+          echo "prepared=true" >> $GITHUB_OUTPUT
+        else
+          echo "prepared=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Upload VEX Statements (if any)
+      id: upload-vex
+      if: ${{ steps.prepare-vex.outputs.prepared == 'true' }}
+      uses: actions/upload-artifact@v4.4.3
+      with:
+        name: ${{ steps.sanitised.outputs.name }}-merged-vex-statements
+        path: ${{ runner.temp }}/${{ steps.sanitised.outputs.name }}-merged.openvex.json
+        retention-days: 30

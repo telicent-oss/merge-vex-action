@@ -1,0 +1,179 @@
+name: Action Self-Tests
+on:
+  push:
+    branches:
+      - "**"
+    tags:
+      - "**"
+  workflow_dispatch:
+
+jobs:
+
+  local-only:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          repository: telicent-oss/telicent-base-images
+          ref: main
+
+      - name: Merging Local VEX Statements Only
+        id: vex-merge
+        uses: telicent-oss/merge-vex-action@v1
+        with:
+          name: local-only
+
+      - name: Download Merged VEX artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.vex-merge.outputs.vex-artifact }}
+
+      - name: Verify Merged VEX file exists
+        run: |
+          if [ ! -f "${{ steps.vex-merge.outputs.vex-file }}" ]; then
+            echo "No Merged VEX file found"
+            exit 1
+          fi
+
+      - name: Show Merged VEX file
+        run: |
+          ls -l
+          cat ${{ steps.vex-merge.outputs.vex-file }}
+          echo ""
+          echo "Unique statements: "
+          cat ${{ steps.vex-merge.outputs.vex-file }} | jq -r '.statements[].vulnerability.name'
+
+      - name: Verify count of unique VEX statements
+        run: |
+          STATEMENTS=$(cat ${{ steps.vex-merge.outputs.vex-file }} | jq -r '.statements[].vulnerability.name' | wc -l)
+          if [ "${STATEMENTS}" -lt 3 ]; then
+            echo "Expected at least 3 unique VEX statements"
+            exit 1
+          fi
+
+  remote-only:
+    runs-on: ubuntu-latest
+    steps:
+      # Intentionally not checking out, relying on remote-vex retrieval
+
+      - name: Merging Remote VEX Statements Only
+        id: vex-merge
+        uses: telicent-oss/merge-vex-action@v1
+        with:
+          name: remote-only
+          remote-vex: |
+            telicent-oss/trivy-action@deduplicate_vex_entries
+            telicent-oss/trivy-action
+              telicent-oss/no-such-repo    
+            telicent-oss/telicent-base-images
+
+      - name: Download Merged VEX artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.vex-merge.outputs.vex-artifact }}
+
+      - name: Verify Merged VEX file exists
+        run: |
+          if [ ! -f "${{ steps.vex-merge.outputs.vex-file }}" ]; then
+            echo "No Merged VEX file found"
+            exit 1
+          fi
+
+      - name: Show Merged VEX file
+        run: |
+          ls -l
+          cat ${{ steps.vex-merge.outputs.vex-file }}
+          echo ""
+          echo "Unique statements: "
+          cat ${{ steps.vex-merge.outputs.vex-file }} | jq -r '.statements[].vulnerability.name'
+
+      - name: Verify count of unique VEX statements
+        run: |
+          STATEMENTS=$(cat ${{ steps.vex-merge.outputs.vex-file }} | jq -r '.statements[].vulnerability.name' | wc -l)
+          if [ "${STATEMENTS}" -lt 3 ]; then
+            echo "Expected at least 3 unique VEX statements"
+            exit 1
+          fi
+
+  local-and-remote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          repository: telicent-oss/telicent-base-images
+          ref: main
+
+      - name: Merging Local and Remote VEX Statements
+        id: vex-merge
+        uses: telicent-oss/merge-vex-action@v1
+        with:
+          name: local-and-remote
+          remote-vex: |
+            telicent-oss/trivy-action
+
+      - name: Download Merged VEX artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.vex-merge.outputs.vex-artifact }}
+
+      - name: Verify Merged VEX file exists
+        run: |
+          if [ ! -f "${{ steps.vex-merge.outputs.vex-file }}" ]; then
+            echo "No Merged VEX file found"
+            exit 1
+          fi
+
+      - name: Show Merged VEX file
+        run: |
+          ls -l
+          cat ${{ steps.vex-merge.outputs.vex-file }}
+          echo ""
+          echo "Unique statements: "
+          cat ${{ steps.vex-merge.outputs.vex-file }} | jq -r '.statements[].vulnerability.name'
+
+      - name: Verify count of unique VEX statements
+        run: |
+          STATEMENTS=$(cat ${{ steps.vex-merge.outputs.vex-file }} | jq -r '.statements[].vulnerability.name' | wc -l)
+          if [ "${STATEMENTS}" -lt 3 ]; then
+            echo "Expected at least 3 unique VEX statements"
+            exit 1
+          fi
+
+  nothing:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Merging Nothing together
+        id: vex-merge
+        uses: telicent-oss/merge-vex-action@v1
+        with:
+          name: nothing
+          remote-vex: |
+            telicent-oss/no-such-repo
+
+      - name: Verify no Merged VEX file prepared
+        run: |
+          if [ "${{ steps.vex-merge.outputs.prepared }}" != "false" ]; then
+            echo "prepared output should have been false but got ${{ steps.vex-merge.outputs.prepared }}"
+            exit 1
+          fi
+
+      - name: Try to download non-existent artifact
+        id: fail-download
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: ${{ steps.vex-merge.outputs.vex-artifact }} 
+
+      - name: Verify artifact failed to download
+        if: ${{ always() }}
+        run: |
+          if [ "${{ steps.fail-download.outcome }}" != "failure" ]; then
+            echo "Trying to download artifact should have failed but had outcome ${{ steps.fail-download.outcome }}"
+            exit 1
+          fi
+
