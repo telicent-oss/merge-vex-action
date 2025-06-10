@@ -197,3 +197,4 @@ runs:
         name: ${{ steps.sanitised.outputs.name }}-merged-vex-statements
         path: ${{ runner.temp }}/${{ steps.sanitised.outputs.name }}-merged.openvex.json
         retention-days: 30
+        overwrite: true
