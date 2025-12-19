@@ -84,7 +84,7 @@ runs:
       shell: bash
       run: |
         # Use runner temporary directory to download Remote VEX statements
-        mkdir ${RUNNER_TEMP}/.remote-vex
+        rm -rf ${RUNNER_TEMP}/.remote-vex && mkdir ${RUNNER_TEMP}/.remote-vex
         pushd ${RUNNER_TEMP}/.remote-vex
 
         # Create an empty Git repository
