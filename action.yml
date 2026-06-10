@@ -228,7 +228,7 @@ runs:
     - name: Upload VEX Statements (if any)
       id: upload-vex
       if: ${{ steps.prepare-vex.outputs.prepared == 'true' }}
-      uses: actions/upload-artifact@v4.4.3
+      uses: actions/upload-artifact@v7.0.1
       with:
         name: ${{ steps.sanitised.outputs.name }}-merged-vex-statements
         path: ${{ runner.temp }}/${{ steps.sanitised.outputs.name }}-merged.openvex.json
