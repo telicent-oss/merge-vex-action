@@ -74,10 +74,46 @@ runs:
       run: |
         echo "name=$(echo '${{ inputs.name }}' | sed 's/[:/<>|*?\]/-/g' | tr -s '-')" >> $GITHUB_OUTPUT
 
-    - name: Setup vexctl
-      uses: openvex/setup-vexctl@main
+    - name: Is vexctl already installed?
+      id: install-check
+      shell: bash
+      run: |
+        if command -v vexctl; then
+          echo "vexctl already installed by a previous job step"
+          echo "installed=true" >> $GITHUB_OUTPUT
+        else
+          echo "installed=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Restore vexctl from Cache
+      id: vexctl-cache
+      if: ${{ steps.install-check.outputs.installed == 'false' }}
+      uses: actions/cache/restore@v5
+      with:
+        key: vexctl-0.3.0-${{ runner.os }}-${{ runner.arch }}
+        path: ${{ runner.temp }}/.vexctl
+        
+    - name: Add restored vexctl to path
+      if: ${{ steps.install-check.outputs.installed == 'false' && steps.vexctl-cache.outputs.cache-hit == 'true' }}
+      shell: bash
+      run: |
+        echo "Using previously installed vexctl from cache"
+        echo "${{ runner.temp }}/.vexctl/" >> $GITHUB_PATH
+
+    - name: Install vexctl if missing
+      id: install-vexctl
+      uses: openvex/setup-vexctl@a19bcb1ebb239098adfbb0f18624a09d253a2a4d
+      if: ${{ steps.install-check.outputs.installed == 'false' && steps.vexctl-cache.outputs.cache-hit != 'true' }}
       with:
         vexctl-release: '0.3.0'
+        install-dir: ${{ runner.temp }}/.vexctl
+
+    - name: Cache Vexctl for future reuse
+      if: ${{ steps.install-vexctl.outcome == 'success' }}
+      uses: actions/cache/save@v5
+      with:
+        key: vexctl-0.3.0-${{ runner.os }}-${{ runner.arch }}
+        path: ${{ runner.temp }}/.vexctl
 
     - name: Download Remote VEX Statements
       if: ${{ inputs.remote-vex != '' }}

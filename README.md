@@ -133,6 +133,14 @@ directory exists on that branch then a build warning is issued e.g.
 This warning is issued regardless of the reason for failure e.g. bad [Token Permissions](#github-token-permissions), no
 `.vex/` directory in remote repository etc.
 
+## `vexctl` Caching
+
+From `v1.1.0` onwards this action caches the `vexctl` executable in the GitHub Actions cache in order to speed up builds
+and address some build flakiness that manifests as intermittent failures installing the `vexctl` binary.
+
+Also if you invoke this action more than once in the same job the `vexctl` executable installed/restored from cache by
+earlier job steps will be reused rather than installing/restoring from cache again.
+
 # Inputs
 
 | Input | Required? | Default | Purpose |

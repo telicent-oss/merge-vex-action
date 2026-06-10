@@ -7,6 +7,9 @@ on:
       - "**"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
 
   local-only:
@@ -176,4 +179,72 @@ jobs:
             echo "Trying to download artifact should have failed but had outcome ${{ steps.fail-download.outcome }}"
             exit 1
           fi
+
+  vexctl-caching:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          repository: telicent-oss/telicent-base-images
+          ref: main
+
+      - name: Merging Local VEX Statements the first time
+        id: first-vex-merge
+        uses: telicent-oss/merge-vex-action@v1
+        with:
+          name: first-merge
+
+      - name: Merging Local VEX Statements again
+        id: second-vex-merge
+        uses: telicent-oss/merge-vex-action@v1
+        with:
+          name: seconds-merge
+
+      - name: Verify vexctl at expected location
+        shell: bash
+        run: |
+          if [ ! -f "${{ runner.temp }}/.vexctl/vexctl" ]; then
+            echo "::error::vexctl not installed at expected location"
+            exit 1
+          fi
+
+      - name: Check if vexctl is cached
+        id: check-cache
+        uses: actions/cache@v5
+        with:
+          key: vexctl-0.3.0-${{ runner.os }}-${{ runner.arch }}
+          path: ${{ runner.temp }}/.vexctl
+          lookup-only: true
+
+      - name: Fail if vexctl not cached
+        if: ${{ steps.check-cache.outputs.cache-hit != 'true' }}
+        shell: bash
+        run: |
+          echo "::error::vexctl not cached for future reuse"
+          exit 1
+
+  vexctl-caching-reuse:
+    needs: [ vexctl-caching ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if vexctl is cached
+        id: check-cache
+        uses: actions/cache@v5
+        with:
+          key: vexctl-0.3.0-${{ runner.os }}-${{ runner.arch }}
+          path: ${{ runner.temp }}/.vexctl
+          lookup-only: true
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          repository: telicent-oss/telicent-base-images
+          ref: main
+
+      - name: Merging Local VEX Statements the third time
+        uses: telicent-oss/merge-vex-action@v1
+        with:
+          name: another-merge
+          
 
