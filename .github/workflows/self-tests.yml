@@ -28,7 +28,7 @@ jobs:
           name: local-only
 
       - name: Download Merged VEX artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ steps.vex-merge.outputs.vex-artifact }}
 
@@ -72,7 +72,7 @@ jobs:
             telicent-oss/telicent-base-images
 
       - name: Download Merged VEX artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ steps.vex-merge.outputs.vex-artifact }}
 
@@ -117,7 +117,7 @@ jobs:
             telicent-oss/trivy-action
 
       - name: Download Merged VEX artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ steps.vex-merge.outputs.vex-artifact }}
 
@@ -167,7 +167,7 @@ jobs:
 
       - name: Try to download non-existent artifact
         id: fail-download
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         continue-on-error: true
         with:
           name: ${{ steps.vex-merge.outputs.vex-artifact }} 
