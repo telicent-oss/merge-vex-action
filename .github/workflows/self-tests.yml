@@ -188,13 +188,13 @@ jobs:
 
       - name: Merging Local VEX Statements the first time
         id: first-vex-merge
-        uses: telicent-oss/merge-vex-action@cache-vexctl
+        uses: telicent-oss/merge-vex-action@v1
         with:
           name: first-merge
 
       - name: Merging Local VEX Statements again
         id: second-vex-merge
-        uses: telicent-oss/merge-vex-action@cache-vexctl
+        uses: telicent-oss/merge-vex-action@v1
         with:
           name: seconds-merge
 
@@ -241,7 +241,7 @@ jobs:
 
       - name: Merging Local VEX Statements the first time
         id: first-vex-merge
-        uses: telicent-oss/merge-vex-action@cache-vexctl
+        uses: telicent-oss/merge-vex-action@v1
         with:
           name: another-merge
           
