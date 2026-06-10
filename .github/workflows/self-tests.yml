@@ -239,8 +239,7 @@ jobs:
           repository: telicent-oss/telicent-base-images
           ref: main
 
-      - name: Merging Local VEX Statements the first time
-        id: first-vex-merge
+      - name: Merging Local VEX Statements the third time
         uses: telicent-oss/merge-vex-action@v1
         with:
           name: another-merge
