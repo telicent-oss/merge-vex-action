@@ -102,7 +102,7 @@ runs:
 
     - name: Install vexctl if missing
       id: install-vexctl
-      uses: openvex/setup-vexctl@20bb15dcf1314ebf56e906fda07892a68d73ac3d
+      uses: openvex/setup-vexctl@6c0a11bbdf28aec4028a06098a3c5957a66c0290
       if: ${{ steps.install-check.outputs.installed == 'false' && steps.vexctl-cache.outputs.cache-hit != 'true' }}
       with:
         vexctl-release: '0.3.0'
