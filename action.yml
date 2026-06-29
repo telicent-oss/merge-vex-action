@@ -88,7 +88,7 @@ runs:
     - name: Restore vexctl from Cache
       id: vexctl-cache
       if: ${{ steps.install-check.outputs.installed == 'false' }}
-      uses: actions/cache/restore@v5
+      uses: actions/cache/restore@v6
       with:
         key: vexctl-0.3.0-${{ runner.os }}-${{ runner.arch }}
         path: ${{ runner.temp }}/.vexctl
@@ -110,7 +110,7 @@ runs:
 
     - name: Cache Vexctl for future reuse
       if: ${{ steps.install-vexctl.outcome == 'success' }}
-      uses: actions/cache/save@v5
+      uses: actions/cache/save@v6
       with:
         key: vexctl-0.3.0-${{ runner.os }}-${{ runner.arch }}
         path: ${{ runner.temp }}/.vexctl

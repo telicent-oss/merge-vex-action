@@ -211,7 +211,7 @@ jobs:
 
       - name: Check if vexctl is cached
         id: check-cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           key: vexctl-0.3.0-${{ runner.os }}-${{ runner.arch }}
           path: ${{ runner.temp }}/.vexctl
@@ -230,7 +230,7 @@ jobs:
     steps:
       - name: Check if vexctl is cached
         id: check-cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           key: vexctl-0.3.0-${{ runner.os }}-${{ runner.arch }}
           path: ${{ runner.temp }}/.vexctl
